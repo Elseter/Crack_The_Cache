@@ -107,11 +107,11 @@ class SimpleGLiNet {
 
     // Get list of connected clients - returns an array of ClientInfo-like objects
     async getClients() {
-    if (!this.sid) throw new Error("Not logged in. Call login() first.");
-    const result = await this.getClientsRaw();
-    const clients = result.clients || [];
-    return clients.map(clientData => ClientInfo.fromDict(clientData));
-}
+        if (!this.sid) throw new Error("Not logged in. Call login() first.");
+        const result = await this.getClientsRaw();
+        const clients = result.clients || [];
+        return clients.map(clientData => ClientInfo.fromDict(clientData));
+    }
 
     // Set alias info for a client by MAC address
     async setAliasInfo(clientMac, newAlias) {
@@ -122,9 +122,24 @@ class SimpleGLiNet {
         };
         return await this.makeRequest("call", [this.sid, "clients", "set_info", changes]);
     }
+
+    // Get system status
+    async getSystemStatus() {
+        if (!this.sid) throw new Error("Not logged in. Call login() first.");
+
+        // Matches the example call:
+        // {"jsonrpc":"2.0","id":7,"method":"call","params":[SID,"system","get_status",{}]}
+        const result = await this.makeRequest("call", [
+            this.sid,
+            "system",
+            "get_status",
+            {}
+        ]);
+
+        return result;
+    }
 }
 
-// Include your md5Crypt function here or import it
 function md5Crypt(password, salt) {
     const CRYPT_ALPHABET = './0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
@@ -225,16 +240,16 @@ function md5Crypt(password, salt) {
 // Usage example
 async function main() {
     const router = new SimpleGLiNet('http://192.168.8.1/rpc', 'root');
-    
+
     try {
         await router.login('Wooimbouttamakeanameformyselfere');
-        
+
         const clients = await router.getClients();
         console.log("Connected Clients:");
         clients.forEach(client => {
             console.log(client.toString());
         });
-        
+
     } catch (error) {
         console.error("Failed to connect:", error.message);
     }

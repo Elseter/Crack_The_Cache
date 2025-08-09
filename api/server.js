@@ -1,9 +1,18 @@
+// Import necessary modules
+// ------------------------
 const express = require('express');
 const cors = require('cors');
 const redis = require('redis');
+const ping = require('ping');
+const mysql = require('mysql2/promise');
+
+
 const { SimpleGLiNet } = require('./router');
 const { ClientInfo } = require('./types');
 
+
+// Configure 
+// ------------------------
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -31,6 +40,17 @@ app.use(express.json());
 const NODOGSPLASH_KEY = 'nodogsplash:';
 const ROUTER_CLIENTS_KEY = 'router_clients:';
 
+const mysqlConfig = {
+  host: process.env.MYSQL_HOST || '127.0.0.1',
+  port: process.env.MYSQL_PORT || 3306,
+  user: process.env.MYSQL_USER || 'blackteam',
+  password: process.env.MYSQL_PASSWORD || 'blackteamsqlauth',
+  database: process.env.MYSQL_DATABASE || 'mydb', // optional
+  connectTimeout: 3000, // 3 seconds timeout
+};
+
+// Helper Functions
+// ------------------------
 // Initialize connections
 async function initializeConnections() {
   try {
@@ -84,11 +104,6 @@ function startClientDataFetching() {
       await redisClient.set(ROUTER_CLIENTS_KEY, JSON.stringify(clientData), { EX: 10 });
 
       console.log(`Fetched ${clients.length} active clients from router`);
-      
-      // Log client details for debugging
-      clients.forEach(client => {
-        console.log(`Client: ${client.alias || client.name || 'Unknown'} - MAC: ${client.mac} - IP: ${client.ip}`);
-      });
 
     } catch (error) {
       console.error('Error fetching clients from router:', error);
@@ -104,6 +119,8 @@ function startClientDataFetching() {
   setInterval(fetchClients, 1000);
 }
 
+// API Endpoints
+// -----------------------------------------------------------
 // API endpoint for user registration
 app.post('/api/register-participant', async (req, res) => {
   try {
@@ -117,7 +134,7 @@ app.post('/api/register-participant', async (req, res) => {
     }
 
     // Check if this client is currently active on the router
-    const isActiveClient = activeClients.some(client => 
+    const isActiveClient = activeClients.some(client =>
       client.mac && client.mac.toLowerCase() === clientmac.toLowerCase()
     );
 
@@ -178,7 +195,7 @@ app.get('/api/router-clients', async (req, res) => {
   try {
     // Try to get from Redis first (cached data)
     const cachedData = await redisClient.get(ROUTER_CLIENTS_KEY);
-    
+
     if (cachedData) {
       const clientData = JSON.parse(cachedData);
       res.json({
@@ -216,10 +233,10 @@ app.get('/api/nodogsplash/auth_users', async (req, res) => {
 
     // Update active status based on current router data
     const updatedUsers = users.map(user => {
-      const isCurrentlyActive = activeClients.some(client => 
+      const isCurrentlyActive = activeClients.some(client =>
         client.mac && client.mac.toLowerCase() === user.clientmac.toLowerCase()
       );
-      
+
       return {
         ...user,
         isCurrentlyActive,
@@ -284,7 +301,9 @@ app.get('/api/router-status', (req, res) => {
   });
 });
 
-// Health check endpoint
+// Health check endpoints
+// ------------------------------------------------------------
+// Overall health endpoint
 app.get('/health', async (req, res) => {
   try {
     const keys = await redisClient.keys(NODOGSPLASH_KEY + '*');
@@ -306,7 +325,136 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// Redis health check endpoint
+app.get('/health/redis', async (req, res) => {
+  const startTime = Date.now();
+  try {
+    if (!redisClient.isOpen) {
+      return res.status(503).json({
+        status: 'unhealthy',
+        message: 'Redis connection is closed',
+        connected: false
+      });
+    }
+
+    // Send PING to verify Redis responsiveness
+    const pong = await redisClient.ping();
+    const latency = Date.now() - startTime;
+
+    // Get server info (optional)
+    const info = await redisClient.info();
+
+    res.json({
+      status: 'healthy',
+      connected: true,
+      pingResponse: pong,
+      latencyMs: latency,
+      redisInfo: info.split('\n').slice(0, 5) // just the first few lines for brevity
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'unhealthy',
+      connected: false,
+      error: error.message
+    });
+  }
+});
+
+// Router health check endpoint
+app.get('/health/router', async (req, res) => {
+  const startTime = Date.now();
+  try {
+    if (!routerConnected || !router) {
+      return res.status(503).json({
+        status: 'unhealthy',
+        message: 'Router is not connected',
+        connected: false
+      });
+    }
+
+    // Try to get system status
+    const statusData = await router.getSystemStatus();
+    const latency = Date.now() - startTime;
+    const clientStats = Array.isArray(statusData.client) && statusData.client.length > 0
+      ? statusData.client[0]
+      : { cable_total: null, wireless_total: null };
+    const wanNetwork = Array.isArray(statusData.network)
+      ? statusData.network.find(n => n.interface === 'wan') || null
+      : null;
+    const theVaultWifi = Array.isArray(statusData.wifi)
+      ? statusData.wifi.find(w => w.ssid === 'The_Vault') || null
+      : null;
+
+    res.json({
+      status: 'healthy',
+      connected: true,
+      latencyMs: latency,
+      network: wanNetwork,
+      wifi: theVaultWifi,
+      uptimeSeconds: statusData.system.uptime,
+      wiredClients: clientStats.cable_total,
+      wirelessClients: clientStats.wireless_total
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'unhealthy',
+      connected: false,
+      error: error.message
+    });
+  }
+});
+
+// Extender health check endpoint
+app.get('/health/extender', async (req, res) => {
+  const host = '192.168.8.138';
+  const startTime = Date.now();
+  
+  try {
+    const result = await ping.promise.probe(host, { timeout: 2 });
+    res.json({
+      status: result.alive ? 'healthy' : 'unreachable',
+      ip: host,
+      latencyMs: result.alive ? Date.now() - startTime : null
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      ip: host,
+      message: error.message
+    });
+  }
+});
+
+// MySQL health check endpoint
+app.get('/health/mysql', async (req, res) => {
+  let connection;
+  const startTime = Date.now();
+  try {
+    connection = await mysql.createConnection(mysqlConfig);
+    // Simple test query
+    const [rows] = await connection.query('SELECT 1');
+    
+    const latency = Date.now() - startTime;
+    
+    res.json({
+      status: 'healthy',
+      latencyMs: latency,
+      queryResult: rows,
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'unhealthy',
+      error: error.message,
+    });
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+});
+
 // Start server
+// -----------------------------------------------------------
 app.listen(PORT, async () => {
   console.log(`Vault Registration Server running on port ${PORT}`);
   console.log(`API endpoints:`);
@@ -315,7 +463,7 @@ app.listen(PORT, async () => {
   console.log(`  - Users: http://localhost:${PORT}/api/users`);
   console.log(`  - Router Status: http://localhost:${PORT}/api/router-status`);
   console.log(`  - Health: http://localhost:${PORT}/health`);
-  
+
   // Initialize connections after server starts
   await initializeConnections();
 });

@@ -1,0 +1,8 @@
+docker run -d \
+  --name mysql-vault-test \
+  -e MYSQL_ROOT_PASSWORD=RootPassword123 \
+  -e MYSQL_DATABASE=mydb \
+  -e MYSQL_USER=blackteam \
+  -e MYSQL_PASSWORD=blackteamsqlauth \
+  -p 3306:3306 \
+  mysql:latest
