@@ -1,0 +1,418 @@
+<html>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel='shortcut icon' href='$imagesdir/vault.ico' type='image/x-icon' />
+<title>VAULT ACCESS TERMINAL - $gatewayname</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        background: #0a0a0a;
+        font-family: 'Orbitron', monospace;
+        color: #00ff41;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow-x: hidden;
+        position: relative;
+    }
+
+    /* Animated matrix-style background */
+    body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image:
+            linear-gradient(90deg, transparent 95%, rgba(0, 255, 65, 0.03) 100%),
+            linear-gradient(0deg, transparent 95%, rgba(0, 255, 65, 0.03) 100%);
+        background-size: 50px 50px;
+        animation: gridMove 20s linear infinite;
+        z-index: -2;
+    }
+
+    /* Floating code fragments */
+    body::after {
+        content: '01001000 01000001 01000011 01001011 ▒▓█ ACCESSING... █▓▒ 01010100 01001000 01000101 ▒▓█ VAULT █▓▒ 01001011 01001001 01001110 01000111';
+        position: fixed;
+        top: 0;
+        left: -100%;
+        width: 200%;
+        height: 20px;
+        color: rgba(0, 255, 65, 0.1);
+        font-family: monospace;
+        font-size: 12px;
+        white-space: nowrap;
+        animation: scrollCode 15s linear infinite;
+        z-index: -1;
+        pointer-events: none;
+    }
+
+    @keyframes gridMove {
+        0% {
+            transform: translate(0, 0);
+        }
+
+        100% {
+            transform: translate(50px, 50px);
+        }
+    }
+
+    @keyframes scrollCode {
+        0% {
+            transform: translateX(0);
+        }
+
+        100% {
+            transform: translateX(50%);
+        }
+    }
+
+    .terminal-container {
+        background: rgb(37, 36, 36);
+        border: 3px solid #00ff41;
+        border-radius: 15px;
+        padding: 30px;
+        max-width: 600px;
+        width: 90%;
+        box-shadow:
+            0 0 30px rgba(0, 255, 65, 0.3),
+            inset 0 0 20px rgba(0, 255, 65, 0.05);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .terminal-container::before {
+        content: '';
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+        background: linear-gradient(45deg, #00ff41, #ff4141, #4141ff, #00ff41);
+        border-radius: 15px;
+        z-index: -1;
+        animation: borderGlow 3s linear infinite;
+    }
+
+    @keyframes borderGlow {
+        0% {
+            background: linear-gradient(45deg, #00ff41, #ff4141, #4141ff, #00ff41);
+        }
+
+        25% {
+            background: linear-gradient(45deg, #4141ff, #00ff41, #ff4141, #4141ff);
+        }
+
+        50% {
+            background: linear-gradient(45deg, #ff4141, #4141ff, #00ff41, #ff4141);
+        }
+
+        75% {
+            background: linear-gradient(45deg, #00ff41, #ff4141, #4141ff, #00ff41);
+        }
+
+        100% {
+            background: linear-gradient(45deg, #00ff41, #ff4141, #4141ff, #00ff41);
+        }
+    }
+
+    .vault-header {
+        text-align: center;
+        margin-bottom: 30px;
+        position: relative;
+    }
+
+    .vault-title {
+        font-size: 2.5em;
+        font-weight: 900;
+        color: #ff4141;
+        text-shadow: 0 0 10px rgba(255, 65, 65, 0.5);
+        margin-bottom: 10px;
+        letter-spacing: 3px;
+    }
+
+    .subtitle {
+        font-size: 1.2em;
+        color: #ffa500;
+        text-shadow: 0 0 5px rgba(255, 165, 0, 0.5);
+        margin-bottom: 5px;
+    }
+
+    .system-info {
+        font-size: 0.9em;
+        color: #00ff41;
+        opacity: 0.8;
+    }
+
+    .access-form {
+        margin: 30px 0;
+    }
+
+    .form-group {
+        margin-bottom: 25px;
+    }
+
+    .form-label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 700;
+        color: #00ff41;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 0.9em;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 15px;
+        background: rgba(0, 0, 0, 0.8);
+        border: 2px solid #00ff41;
+        border-radius: 8px;
+        color: #00ff41;
+        font-family: 'Orbitron', monospace;
+        font-size: 1.1em;
+        font-weight: 700;
+        transition: all 0.3s ease;
+        box-shadow: inset 0 0 10px rgba(0, 255, 65, 0.1);
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: #ff4141;
+        box-shadow:
+            inset 0 0 10px rgba(255, 65, 65, 0.2),
+            0 0 15px rgba(255, 65, 65, 0.3);
+        color: #ff4141;
+    }
+
+    .form-input::placeholder {
+        color: rgba(0, 255, 65, 0.5);
+        font-weight: 400;
+    }
+
+    .access-button {
+        width: 100%;
+        padding: 18px;
+        background: linear-gradient(45deg, #ff4141, #ff6b6b);
+        border: none;
+        border-radius: 8px;
+        color: #000;
+        font-family: 'Orbitron', monospace;
+        font-size: 1.3em;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 5px 15px rgba(255, 65, 65, 0.3);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .access-button:hover {
+        background: linear-gradient(45deg, #ff6b6b, #ff4141);
+        box-shadow: 0 8px 25px rgba(255, 65, 65, 0.5);
+        transform: translateY(-2px);
+    }
+
+    .access-button:active {
+        transform: translateY(0);
+        box-shadow: 0 3px 10px rgba(255, 65, 65, 0.3);
+    }
+
+    .status-display {
+        background: rgba(0, 255, 65, 0.1);
+        border: 1px solid #00ff41;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 20px 0;
+        font-family: monospace;
+        font-size: 0.9em;
+    }
+
+    .status-line {
+        margin: 3px 0;
+        opacity: 0.8;
+    }
+
+    .warning {
+        color: #ffa500;
+        text-align: center;
+        font-weight: 700;
+        margin: 20px 0;
+        padding: 15px;
+        background: rgba(255, 165, 0, 0.1);
+        border: 1px solid #ffa500;
+        border-radius: 8px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .loading {
+        display: none;
+        text-align: center;
+        color: #00ff41;
+        margin: 20px 0;
+    }
+
+    .spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(0, 255, 65, 0.3);
+        border-top: 2px solid #00ff41;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 10px;
+    }
+
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    .error-message {
+        color: #ff4141;
+        background: rgba(255, 65, 65, 0.1);
+        border: 1px solid #ff4141;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 15px 0;
+        text-align: center;
+        display: none;
+    }
+
+    @media (max-width: 768px) {
+        .vault-title {
+            font-size: 2em;
+            letter-spacing: 2px;
+        }
+
+        .terminal-container {
+            padding: 20px;
+            margin: 20px;
+        }
+    }
+</style>
+</head>
+
+<body>
+    <div class="terminal-container">
+        <div class="vault-header">
+            <h1 class="vault-title">HACK THE KING'S CACHE</h1>
+            <div class="subtitle">VAULT ACCESS TERMINAL</div>
+            <div class="system-info">System: $gatewayname | Status: LOCKED</div>
+        </div>
+
+        <div class="status-display">
+            <div class="status-line">► Device IP: $clientip</div>
+            <div class="status-line">► Device MAC: $clientmac</div>
+            <div class="status-line">► Active Sessions: $nclients/$maxclients</div>
+            <div class="status-line">► System Uptime: $uptime</div>
+        </div>
+
+        <div class="warning">
+            ⚠ AUTHORIZATION REQUIRED ⚠<br>
+            Enter your alias to access the vault network
+        </div>
+
+        <form id="vaultAccessForm" class="access-form" method="get" action="$authaction">
+            <input type="hidden" name="tok" value="$tok">
+            <input type="hidden" name="redir" value="$redir">
+
+            <div class="form-group">
+                <label class="form-label" for="hackerName">Alias:</label>
+                <input type="text" id="hackerName" name="nodoguser" class="form-input" placeholder="Enter your alias..."
+                    required maxlength="50" pattern="[A-Za-z0-9_-]+"
+                    title="Alphanumeric characters, underscores, and hyphens only">
+            </div>
+
+            <button type="submit" class="access-button" id="accessBtn">
+                INITIATE VAULT ACCESS
+            </button>
+        </form>
+
+        <div class="loading" id="loadingIndicator">
+            <div class="spinner"></div>
+            Establishing secure connection...
+        </div>
+
+        <div class="error-message" id="errorMessage">
+            Access denied. Please try again.
+        </div>
+
+        <script>
+            document.getElementById('vaultAccessForm').addEventListener('submit', function (e) {
+                const hackerName = document.getElementById('hackerName').value.trim();
+                const loadingIndicator = document.getElementById('loadingIndicator');
+                const errorMessage = document.getElementById('errorMessage');
+                const accessBtn = document.getElementById('accessBtn');
+                
+                // Hide any previous error messages
+                errorMessage.style.display = 'none';
+
+                // Basic validation
+                if (!hackerName) {
+                    e.preventDefault();
+                    errorMessage.textContent = 'Alias is required for vault access.';
+                    errorMessage.style.display = 'block';
+                    return;
+                }
+
+                if (!/^[A-Za-z0-9_-]+$/.test(hackerName)) {
+                    e.preventDefault();
+                    errorMessage.textContent = 'Invalid alias format. Use only letters, numbers, underscores, and hyphens.';
+                    errorMessage.style.display = 'block';
+                    return;
+                }
+
+                // Show loading state
+                loadingIndicator.style.display = 'block';
+                accessBtn.textContent = 'ACCESSING VAULT...';
+                accessBtn.disabled = true;
+
+                // Register participant asynchronously (don't prevent form submission)
+                const participantData = {
+                    alias: hackerName,
+                    clientip: '$clientip',
+                    clientmac: '$clientmac',
+                    timestamp: new Date().toISOString()
+                };
+
+                // Send registration to your server (fire and forget)
+                fetch('http://192.168.8.136:3000/api/register-participant', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(participantData)
+                }).catch(function(error) {
+                    console.log('Registration attempt failed:', error);
+                    // Don't prevent nodogsplash authentication even if registration fails
+                });
+
+                // Let the form submit to nodogsplash for authentication
+                // The form will naturally submit to $authaction after this function completes
+            });
+        </script>
+    </div>
+</body>
+</html>
