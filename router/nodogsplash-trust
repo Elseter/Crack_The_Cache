@@ -1,0 +1,39 @@
+#!/bin/sh /etc/rc.common
+START=99
+USE_PROCD=1
+MAC_FILE="/etc/nodogsplash/trusted_macs.list"
+
+start_service() {
+    logger -t nodogsplash-trust "Starting trust script, waiting for nodogsplash to be ready..."
+
+    for i in $(seq 1 30); do
+        if ndsctl status >/dev/null 2>&1; then
+            logger -t nodogsplash-trust "nodogsplash control socket is responding."
+            break
+        fi
+        logger -t nodogsplash-trust "Not ready yet, retry $i..."
+        sleep 1
+    done
+
+    if ! ndsctl status >/dev/null 2>&1; then
+        logger -t nodogsplash-trust "ERROR: nodogsplash did not start within timeout."
+        return 1
+    fi
+
+    if [ ! -f "$MAC_FILE" ]; then
+        logger -t nodogsplash-trust "No MAC file found at $MAC_FILE, skipping."
+        return 0
+    fi
+
+    logger -t nodogsplash-trust "Adding trusted MACs from $MAC_FILE..."
+    while IFS= read -r mac; do
+        # skip empty lines or comments
+        [ -z "$mac" ] && continue
+        case "$mac" in
+            \#*) continue ;;
+        esac
+        ndsctl trust "$mac" && logger -t nodogsplash-trust "Added MAC $mac"
+    done < "$MAC_FILE"
+
+    logger -t nodogsplash-trust "Finished adding trusted MACs."
+}

@@ -233,6 +233,13 @@
         box-shadow: 0 3px 10px rgba(255, 65, 65, 0.3);
     }
 
+    .access-button:disabled {
+        background: linear-gradient(45deg, #666, #888);
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: 0 3px 10px rgba(102, 102, 102, 0.3);
+    }
+
     .status-display {
         background: rgba(0, 255, 65, 0.1);
         border: 1px solid #00ff41;
@@ -317,7 +324,7 @@
 <body>
     <div class="terminal-container">
         <div class="vault-header">
-            <h1 class="vault-title">HACK THE KING'S CACHE</h1>
+            <h1 class="vault-title">THE KING'S CACHE</h1>
             <div class="subtitle">VAULT ACCESS TERMINAL</div>
             <div class="system-info">System: $gatewayname | Status: LOCKED</div>
         </div>
@@ -362,14 +369,12 @@
         <script>
             document.getElementById('vaultAccessForm').addEventListener('submit', function (e) {
                 const hackerName = document.getElementById('hackerName').value.trim();
-                const loadingIndicator = document.getElementById('loadingIndicator');
                 const errorMessage = document.getElementById('errorMessage');
-                const accessBtn = document.getElementById('accessBtn');
                 
                 // Hide any previous error messages
                 errorMessage.style.display = 'none';
 
-                // Basic validation
+                // Basic validation only - don't modify UI state yet
                 if (!hackerName) {
                     e.preventDefault();
                     errorMessage.textContent = 'Alias is required for vault access.';
@@ -384,12 +389,7 @@
                     return;
                 }
 
-                // Show loading state
-                loadingIndicator.style.display = 'block';
-                accessBtn.textContent = 'ACCESSING VAULT...';
-                accessBtn.disabled = true;
-
-                // Register participant asynchronously (don't prevent form submission)
+                // Registration data for your server
                 const participantData = {
                     alias: hackerName,
                     clientip: '$clientip',
@@ -397,8 +397,8 @@
                     timestamp: new Date().toISOString()
                 };
 
-                // Send registration to your server (fire and forget)
-                fetch('http://192.168.8.136:3000/api/register-participant', {
+                // Send registration to your server (fire and forget - don't wait for response)
+                fetch('http://192.168.8.191:3000/api/register-participant', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -409,8 +409,8 @@
                     // Don't prevent nodogsplash authentication even if registration fails
                 });
 
-                // Let the form submit to nodogsplash for authentication
-                // The form will naturally submit to $authaction after this function completes
+                // Don't modify button state or show loading - let form submit immediately
+                // The form will now submit normally to nodogsplash $authaction
             });
         </script>
     </div>
