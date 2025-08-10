@@ -337,19 +337,42 @@ app.get('/health/redis', async (req, res) => {
       });
     }
 
-    // Send PING to verify Redis responsiveness
     const pong = await redisClient.ping();
     const latency = Date.now() - startTime;
+    const infoRaw = await redisClient.info();
 
-    // Get server info (optional)
-    const info = await redisClient.info();
+    // Parse the info into an object
+    const lines = infoRaw.split('\n');
+    const info = {};
+    lines.forEach(line => {
+      if (line && !line.startsWith('#')) {
+        const parts = line.split(':');
+        if (parts.length === 2) {
+          info[parts[0]] = parts[1].trim();
+        }
+      }
+    });
+
+    // Extract some useful stats
+    const dbKeys = Object.entries(info)
+      .filter(([key]) => key.startsWith('db'))
+      .map(([db, val]) => {
+        // val example: keys=1,expires=0,avg_ttl=0
+        const keys = val.match(/keys=(\d+)/);
+        return { db, keys: keys ? parseInt(keys[1], 10) : 0 };
+      });
 
     res.json({
       status: 'healthy',
       connected: true,
       pingResponse: pong,
       latencyMs: latency,
-      redisInfo: info.split('\n').slice(0, 5) // just the first few lines for brevity
+      memoryUsedBytes: parseInt(info.used_memory || '0', 10),
+      totalCommandsProcessed: parseInt(info.total_commands_processed || '0', 10),
+      instantaneousOpsPerSec: parseInt(info.instantaneous_ops_per_sec || '0', 10),
+      connectedClients: parseInt(info.connected_clients || '0', 10),
+      dbKeys,
+      rawInfoSample: lines.slice(0, 10) // just a sample of the info for extra debug
     });
   } catch (error) {
     res.status(500).json({

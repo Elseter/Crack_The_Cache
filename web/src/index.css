@@ -1,1 +1,10 @@
 @import "tailwindcss";
+/* Set dashboard background color to Tailwind's slate-900 */
+body, #root {
+  background-color: #0f172a;
+  /* You can also add a fallback or other styling here if needed */
+  color: #e0e7ff; /* Optional: set a light text color for readability */
+  min-height: 100vh; /* Ensure full viewport height */
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
