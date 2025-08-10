@@ -21,6 +21,9 @@ const ROUTER_URL = process.env.ROUTER_URL || 'http://192.168.8.1/rpc';
 const ROUTER_USERNAME = process.env.ROUTER_USERNAME || 'root';
 const ROUTER_PASSWORD = process.env.ROUTER_PASSWORD || 'Wooimbouttamakeanameformyselfere';
 
+// ESP32 configuration
+const ESP32_URL = process.env.ESP32_URL || 'http://192.168.8.127';
+
 // Create Redis client
 const redisClient = redis.createClient();
 
@@ -301,6 +304,21 @@ app.get('/api/router-status', (req, res) => {
   });
 });
 
+// ESP32 interaction endpoints
+// ------------------------------------------------------------
+app.get('/api/esp32/status', async (req, res) => {
+  try {
+    const response = await fetch(`${ESP32_URL}/status`);
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `ESP32 responded with status ${response.status}` });
+    }
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch ESP32 status', details: error.message });
+  }
+});
+
 // Health check endpoints
 // ------------------------------------------------------------
 // Overall health endpoint
@@ -454,15 +472,44 @@ app.get('/health/mysql', async (req, res) => {
   const startTime = Date.now();
   try {
     connection = await mysql.createConnection(mysqlConfig);
-    // Simple test query
-    const [rows] = await connection.query('SELECT 1');
-    
+
+    // Simple test query to verify connectivity
+    await connection.query('SELECT 1');
+
+    // Fetch extended status variables
+    const [statusRows] = await connection.query('SHOW GLOBAL STATUS');
+    const [variablesRows] = await connection.query('SHOW GLOBAL VARIABLES');
+    const [databases] = await connection.query("SHOW DATABASES");
+
+    // Extract some interesting stats from status
+    const uptime = statusRows.find(r => r.Variable_name === 'Uptime')?.Value || null;
+    const threadsConnected = statusRows.find(r => r.Variable_name === 'Threads_connected')?.Value || null;
+    const threadsRunning = statusRows.find(r => r.Variable_name === 'Threads_running')?.Value || null;
+    const queries = statusRows.find(r => r.Variable_name === 'Queries')?.Value || null;
+    const version = variablesRows.find(v => v.Variable_name === 'version')?.Value || null;
+
+    // Optionally, calculate total size of databases in bytes (approximate)
+    // This requires querying INFORMATION_SCHEMA
+    const [dbSizes] = await connection.query(`
+      SELECT table_schema AS dbName, 
+             SUM(data_length + index_length) AS size_bytes 
+      FROM information_schema.tables 
+      WHERE table_schema NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys')
+      GROUP BY table_schema;
+    `);
+
     const latency = Date.now() - startTime;
-    
+
     res.json({
       status: 'healthy',
       latencyMs: latency,
-      queryResult: rows,
+      version,
+      uptimeSeconds: uptime ? parseInt(uptime, 10) : null,
+      threadsConnected: threadsConnected ? parseInt(threadsConnected, 10) : null,
+      threadsRunning: threadsRunning ? parseInt(threadsRunning, 10) : null,
+      totalQueries: queries ? parseInt(queries, 10) : null,
+      databases: databases.map(db => db.Database),
+      dbSizes: dbSizes.map(d => ({ database: d.dbName, sizeBytes: d.size_bytes })),
     });
   } catch (error) {
     res.status(503).json({
@@ -475,6 +522,7 @@ app.get('/health/mysql', async (req, res) => {
     }
   }
 });
+
 
 // Start server
 // -----------------------------------------------------------

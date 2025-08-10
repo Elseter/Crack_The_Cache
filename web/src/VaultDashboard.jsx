@@ -27,8 +27,24 @@ const VaultDashboard = () => {
             wifi: null,
             wiredClients: 0,
             wirelessClients: 0
-        }, extender: { status: 'unknown', latencyMs: 0 },
-        mysql: { status: 'unknown', latencyMs: 0 }
+        },
+        extender: { status: 'unknown', latencyMs: 0 },
+        mysql: {
+            status: 'unknown',
+            latencyMs: 0,
+            version: '',
+            uptimeSeconds: 0,
+            threadsConnected: 0,
+            threadsRunning: 0,
+            totalQueries: 0,
+            databases: [],
+            dbSizes: []
+        },
+        esp32: {
+            relay1: false,
+            relay2: false,
+            relay3: false,
+        },
     });
 
     const [registeredUsers, setRegisteredUsers] = useState([]);
@@ -53,12 +69,17 @@ const VaultDashboard = () => {
     // Fetch health data
     const fetchHealthData = async () => {
         try {
-            const [overall, redis, router, extender, mysql] = await Promise.all([
+            const [overall, redis, router, extender, mysql, esp32] = await Promise.all([
                 fetch(`${API_BASE}/health`).then(r => r.json()).catch(() => ({ status: 'error' })),
                 fetch(`${API_BASE}/health/redis`).then(r => r.json()).catch(() => ({ status: 'error' })),
                 fetch(`${API_BASE}/health/router`).then(r => r.json()).catch(() => ({ status: 'error' })),
                 fetch(`${API_BASE}/health/extender`).then(r => r.json()).catch(() => ({ status: 'error' })),
-                fetch(`${API_BASE}/health/mysql`).then(r => r.json()).catch(() => ({ status: 'error' }))
+                fetch(`${API_BASE}/health/mysql`).then(r => r.json()).catch(() => ({ status: 'error' })),
+                fetch(`${API_BASE}/api/esp32/status`).then(r => r.json()).catch(() => ({
+                    relay1: false,
+                    relay2: false,
+                    relay3: false,
+                })),
             ]);
 
             setHealthData({
@@ -86,7 +107,22 @@ const VaultDashboard = () => {
                     wirelessClients: router.wirelessClients || 0,
                 },
                 extender,
-                mysql
+                mysql: {
+                    status: mysql.status || 'unknown',
+                    latencyMs: mysql.latencyMs || 0,
+                    version: mysql.version || '',
+                    uptimeSeconds: mysql.uptimeSeconds || 0,
+                    threadsConnected: mysql.threadsConnected || 0,
+                    threadsRunning: mysql.threadsRunning || 0,
+                    totalQueries: mysql.totalQueries || 0,
+                    databases: mysql.databases || [],
+                    dbSizes: mysql.dbSizes || []
+                },
+                esp32: {
+                    relay1: esp32.relay1 || false,
+                    relay2: esp32.relay2 || false,
+                    relay3: esp32.relay3 || false,
+                },
             });
 
             setLastUpdate(new Date());
@@ -155,6 +191,7 @@ const VaultDashboard = () => {
             {/* Floating Health Status Panel */}
             <div className={`fixed top-4 left-4 right-4 z-50 transition-all duration-300 ${scrolled ? 'transform scale-90' : ''
                 }`}>
+
                 <div className="bg-slate-800/95 backdrop-blur-sm border border-slate-700 rounded-lg shadow-2xl">
                     <div className="flex items-center justify-between p-4 border-b border-slate-700">
                         <div className="flex items-center space-x-3">
@@ -175,9 +212,28 @@ const VaultDashboard = () => {
                             </button>
                         </div>
                     </div>
-
                     {/* Health Status Grid */}
                     <div className={`p-4 transition-all duration-300 ${scrolled ? 'py-2' : ''}`}>
+                        {/* ESP32 Locks Status Bars */}
+                        <div className={`flex space-x-2 p-4 border-b border-slate-700 `}>
+                            {['Lock 1', 'Lock 2', 'Lock 3'].map((lock, idx) => {
+                                // Assuming healthData.esp32 has keys like 'relay1', 'relay2', 'relay3' corresponding to the locks:
+                                const relayKey = `relay${idx + 1}`;
+                                const isLocked = healthData.esp32?.[relayKey];
+                                return (
+                                    <div
+                                        key={lock}
+                                        className={`flex-1 rounded-md font-semibold flex items-center justify-center
+                                            ${getStatusColor(isLocked ? 'error' : 'healthy')}
+                                            transition-colors duration-300
+                                            `}
+                                        style={{ height: scrolled ? '1.75rem' : '2rem' }}
+                                    >
+                                        {lock}
+                                    </div>
+                                );
+                            })}
+                        </div>
                         <div className={`grid gap-3 ${scrolled ? 'grid-cols-5' : 'grid-cols-2 md:grid-cols-5'}`}>
 
                             {/* Extender */}
@@ -282,9 +338,14 @@ const VaultDashboard = () => {
                                     {getStatusIcon(healthData.mysql.status)}
                                 </div>
                                 <div className={`mt-1 ${scrolled ? 'text-xs' : 'text-sm'} font-medium`}>MySQL</div>
+
                                 {showDetails && !scrolled && (
-                                    <div className="text-xs text-gray-400 mt-1">
-                                        {healthData.mysql.latencyMs}ms
+                                    <div className="text-xs text-gray-400 mt-1 space-y-1">
+                                        <div>Latency: <span className="font-semibold">{healthData.mysql.latencyMs ?? 0} ms</span></div>
+                                        <div>Uptime: {healthData.mysql.uptimeSeconds ? formatUptime(healthData.mysql.uptimeSeconds) : 'N/A'}</div>
+                                        <div>Threads Con: <span className="font-semibold">{healthData.mysql.threadsConnected}</span></div>
+                                        <div>Threads Running: <span className="font-semibold">{healthData.mysql.threadsRunning}</span></div>
+                                        <div>Total Queries: <span className="font-semibold">{healthData.mysql.totalQueries}</span></div>
                                     </div>
                                 )}
                             </div>
@@ -310,7 +371,7 @@ const VaultDashboard = () => {
             <div className={`transition-all duration-300 ${scrolled ? 'pt-28' : 'pt-48'} px-4 pb-8`}>
                 <div className="max-w-7xl mx-auto">
                     {/* Header */}
-                    <div className="text-center mb-12 pt-30">
+                    <div className="text-center mb-12 pt-45">
                         <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
                             THE VAULT NETWORK
                         </h1>
